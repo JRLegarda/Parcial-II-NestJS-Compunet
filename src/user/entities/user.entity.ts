@@ -1,4 +1,4 @@
-import { Program } from "src/program/entities/program.entity";
+import { Program } from "../../program/entities/program.entity";
 import { BeforeInsert, BeforeUpdate, Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 @Entity()

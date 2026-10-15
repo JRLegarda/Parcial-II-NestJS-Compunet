@@ -8,7 +8,7 @@
 //
 // Usa imports relativos (ej. "../../student/entities/student.entity"), no "src/...":
 
-import { User } from "src/user/entities/user.entity";
+import { User } from "../../user/entities/user.entity";
 import { Student } from "../../student/entities/student.entity";
 import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 

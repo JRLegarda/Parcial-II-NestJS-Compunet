@@ -8,7 +8,7 @@ import { isUUID } from 'class-validator';
 import { AssignStudentsDto } from './dto/assign-students.dto';
 import { Student } from '../student/entities/student.entity';
 import { BulkCreateProgramDto } from './dto/bulk-create-program.dto';
-import { User } from 'src/user/entities/user.entity';
+import { User } from '../user/entities/user.entity';
 
 @Injectable()
 export class ProgramService {
