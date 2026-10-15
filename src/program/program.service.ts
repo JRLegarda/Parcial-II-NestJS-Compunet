@@ -8,6 +8,7 @@ import { isUUID } from 'class-validator';
 import { AssignStudentsDto } from './dto/assign-students.dto';
 import { Student } from '../student/entities/student.entity';
 import { BulkCreateProgramDto } from './dto/bulk-create-program.dto';
+import { User } from 'src/user/entities/user.entity';
 
 @Injectable()
 export class ProgramService {
@@ -23,11 +24,12 @@ export class ProgramService {
 
     // TODO Reto 1: create(createProgramDto, user) -> guarda el programa
     //   - nombre o código repetido -> 409 Conflict (no 500)
-    async create(createProgramDto: CreateProgramDto): Promise<Program> {
+    async create(createProgramDto: CreateProgramDto, user: User): Promise<Program> {
         try {
             const program = this.programRepository.create({
                 ...createProgramDto,
             });
+            program.createdBy = user;
             await this.programRepository.save(program);
             return program;
         } catch (error) {
@@ -121,14 +123,14 @@ export class ProgramService {
 
     // TODO Reto 3: bulkCreate(bulkCreateProgramDto, user) -> crea todos los programas o ninguno
     //   (transacción). Cualquier nombre/código repetido -> 409 y rollback.
-    async createMany(bulkCreateProgramDto: BulkCreateProgramDto): Promise<Program[]> {
+    async createMany(bulkCreateProgramDto: BulkCreateProgramDto, user:User): Promise<Program[]> {
         const queryRunner = this.datasource.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
 
         try {
             const programs = bulkCreateProgramDto.programs.map((dto) =>
-                this.programRepository.create({ ...dto }),
+                this.programRepository.create({ ...dto, createdBy: user }),
             );
             await queryRunner.manager.save(programs);
             await queryRunner.commitTransaction();

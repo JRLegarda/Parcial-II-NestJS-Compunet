@@ -1,4 +1,5 @@
-import { BeforeInsert, BeforeUpdate, Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Program } from "src/program/entities/program.entity";
+import { BeforeInsert, BeforeUpdate, Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 @Entity()
 export class User {
@@ -30,6 +31,12 @@ export class User {
         default: ["teacher"]
     })
     roles: string[];
+
+    @OneToMany(
+        () => Program,
+        (program) => program.createdBy,
+    )
+    programs?: Program[];
 
     @BeforeInsert()
     @BeforeUpdate()
