@@ -7,7 +7,7 @@ import { PaginationDto } from './dto/pagination.dto';
 import { isUUID } from 'class-validator';
 import { AssignStudentsDto } from './dto/assign-students.dto';
 import { Student } from '../student/entities/student.entity';
-import { CreateProgramsDto } from './dto/create-programs.dto';
+import { BulkCreateProgramDto } from './dto/bulk-create-program.dto';
 
 @Injectable()
 export class ProgramService {
@@ -121,13 +121,13 @@ export class ProgramService {
 
     // TODO Reto 3: bulkCreate(bulkCreateProgramDto, user) -> crea todos los programas o ninguno
     //   (transacción). Cualquier nombre/código repetido -> 409 y rollback.
-    async createMany(createProgramsDto: CreateProgramsDto): Promise<Program[]> {
+    async createMany(bulkCreateProgramDto: BulkCreateProgramDto): Promise<Program[]> {
         const queryRunner = this.datasource.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
 
         try {
-            const programs = createProgramsDto.programs.map((dto) =>
+            const programs = bulkCreateProgramDto.programs.map((dto) =>
                 this.programRepository.create({ ...dto }),
             );
             await queryRunner.manager.save(programs);
