@@ -3,7 +3,7 @@
 //   - code: string de 3 a 6 letras MAYÚSCULAS (ej. "SIS", "MED")
 
 import { Type } from "class-transformer";
-import { IsInt, IsOptional, IsPositive, IsString, MaxLength, MinLength } from "class-validator";
+import { IsInt, IsPositive, IsString, Matches, MaxLength, MinLength } from "class-validator";
 
 //   - credits: entero positivo
 export class CreateProgramDto {
@@ -15,6 +15,7 @@ export class CreateProgramDto {
     @IsString()
     @MinLength(3)
     @MaxLength(6)
+    @Matches(/^[A-Z]{3,6}$/)
     code: string;
 
     @Type(() => Number)

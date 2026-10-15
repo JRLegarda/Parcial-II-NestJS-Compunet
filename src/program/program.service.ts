@@ -1,14 +1,48 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, HttpException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Program } from './entities/program.entity';
+import { DataSource, Repository } from 'typeorm';
+import { CreateProgramDto } from './dto/create-program.dto';
+import { PaginationDto } from './dto/pagination.dto';
 
 @Injectable()
 export class ProgramService {
 
     // TODO Reto 1: inyecta el repositorio de Program (y lo que necesites para las transacciones)
+    private readonly logger = new Logger("ProgramService");
+    
+    constructor(
+        @InjectRepository(Program)
+        private readonly programRepository: Repository<Program>,
+        private datasource: DataSource
+    ){}
 
     // TODO Reto 1: create(createProgramDto, user) -> guarda el programa
     //   - nombre o código repetido -> 409 Conflict (no 500)
+    async create(createProgramDto: CreateProgramDto): Promise<Program> {
+        try {
+            const program = this.programRepository.create({
+                ...createProgramDto,
+            });
+            await this.programRepository.save(program);
+            return program;
+        } catch (error) {
+            this.handleException(error);
+        }
+    }
 
     // TODO Reto 1: findAll(paginationDto) -> lista paginada (limit / skip)
+    async findAll(paginationDto: PaginationDto){
+        try{
+            const {skip, limit} = paginationDto;
+            return await this.programRepository.find({
+                take: limit,
+                skip: skip
+            });
+        }catch(error){
+            this.handleException(error);
+        }
+    }
 
     // TODO Reto 2: findOne(id) -> programa con sus estudiantes, 404 si no existe
 
@@ -20,4 +54,13 @@ export class ProgramService {
 
     // TODO Reto 3: bulkCreate(bulkCreateProgramDto, user) -> crea todos los programas o ninguno
     //   (transacción). Cualquier nombre/código repetido -> 409 y rollback.
+
+    private handleException(error: any): never {
+        if (error instanceof HttpException) throw error;
+        if (error.code === '23505') {
+            throw new ConflictException(error.detail);
+        }
+        this.logger.error(error);
+        throw new InternalServerErrorException('Unexpected error, check server logs');
+    }
 }
