@@ -1,4 +1,4 @@
-import { ConflictException, HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Program } from './entities/program.entity';
 import { DataSource, Repository } from 'typeorm';
@@ -6,6 +6,8 @@ import { CreateProgramDto } from './dto/create-program.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { isUUID } from 'class-validator';
 import { AssignStudentsDto } from './dto/assign-students.dto';
+import { Student } from '../student/entities/student.entity';
+import { CreateProgramsDto } from './dto/create-programs.dto';
 
 @Injectable()
 export class ProgramService {
@@ -47,30 +49,21 @@ export class ProgramService {
     }
 
     // TODO Reto 2: findOne(id) -> programa con sus estudiantes, 404 si no existe
-    async findOne(term: string) {
-        let program: Program | null;
-        try {
-            if (isUUID(term)) {
-                program = await this.programRepository.findOne({
-                    where: { id: term },
-                    relations: { students: true },
-                });
-            } else {
-                program = await this.programRepository
-                    .createQueryBuilder('program')
-                    .leftJoinAndSelect('program.students', 'students')
-                    .where('UPPER(program.name) = :name', { name: term.toUpperCase() })
-                    .getOne();
-            }
-
-            if (!program) {
-                throw new NotFoundException(`Program with ${term} not found`);
-            }
-
-            return program;
-        } catch (error) {
-            this.handleException(error);
+    async findOne(id: string) {
+        if (!isUUID(id)) {
+            throw new BadRequestException(`id ${id} is not a valid UUID`);
         }
+
+        const program = await this.programRepository.findOne({
+            where: { id },
+            relations: { students: true },
+        });
+
+        if (!program) {
+            throw new NotFoundException(`Program with id ${id} not found`);
+        }
+
+        return program;
     }
 
     // TODO Reto 2: assignStudents(id, assignStudentsDto) -> AGREGA estudiantes al programa
@@ -78,58 +71,48 @@ export class ProgramService {
     //   Mismo patrón del update de estudiantes corregido en clase (combinar las notas):
     //   traer los actuales -> combinar con los nuevos -> guardar la lista completa.
     //   Si algún id no existe: 404 y rollback.
-    async assignStudents(id: string, assignStudentsDto : AssignStudentsDto){
-        const {grades, ...studentDetails } = updateStudentDto;
+    async assignStudents(id: string, assignStudentsDto: AssignStudentsDto) {
+        const { studentIds } = assignStudentsDto;
 
-        const student = await this.studentRepository.preload({
-            id,
-            ...studentDetails
-        })
-
-        if(!student) throw new NotFoundException("Student with id ${id} not found");
+        const program = await this.programRepository.preload({ id });
+        if (!program) throw new NotFoundException(`Program with id ${id} not found`);
 
         const queryRunner = this.datasource.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
 
-        try{
-            if(grades){
-            //1. Traer las notas que el estudiante tiene hoy
-                const currentGrades= await queryRunner.manager.find(Grades, {
-                    where: {student : {id}}
-                }
-                )
+        try {
+            // 1. Traer los estudiantes que el programa tiene hoy
+            const currentStudents = await queryRunner.manager.find(Student, {
+                where: { program: { id } },
+            });
 
-                // 2. combinar: actualizar las notas que existen, agregar las nuevas si llegan nuevas
-                for (const newGrade of grades){
-                    const existing = currentGrades.find(
-                        grade => grade.subject.toLowerCase() === newGrade.subject.toLowerCase()
-                    );
+            // 2. Combinar: agregar solo los nuevos (los que ya están no se repiten)
+            for (const studentId of studentIds) {
+                const existing = currentStudents.find(
+                    (student) => student.id === studentId,
+                );
 
-                    if(existing) {
-                        existing.grade = newGrade.grade
-                    }else{
-                        currentGrades.push(this.gradesRepository.create({
-                            subject: newGrade.subject,
-                            grade: newGrade.grade
-                        }))
+                if (!existing) {
+                    const student = await queryRunner.manager.findOneBy(Student, {
+                        id: studentId,
+                    });
+                    if (!student) {
+                        throw new NotFoundException(`Student with id ${studentId} not found`);
                     }
-
-
+                    currentStudents.push(student);
                 }
-
-                //3 guardar la lista de notas completas, no queda niguna nota huerfana
-                student.grades = currentGrades;
-
             }
 
-            await queryRunner.manager.save(student);
+            // 3. Guardar la lista completa: no queda ningún estudiante huérfano
+            program.students = currentStudents;
+
+            await queryRunner.manager.save(program);
             await queryRunner.commitTransaction();
             await queryRunner.release();
 
-            return await this.findOne(student.id);
-
-        }catch(error){
+            return await this.findOne(program.id);
+        } catch (error) {
             await queryRunner.rollbackTransaction();
             await queryRunner.release();
             this.handleException(error);
@@ -138,6 +121,25 @@ export class ProgramService {
 
     // TODO Reto 3: bulkCreate(bulkCreateProgramDto, user) -> crea todos los programas o ninguno
     //   (transacción). Cualquier nombre/código repetido -> 409 y rollback.
+    async createMany(createProgramsDto: CreateProgramsDto): Promise<Program[]> {
+        const queryRunner = this.datasource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
+
+        try {
+            const programs = createProgramsDto.programs.map((dto) =>
+                this.programRepository.create({ ...dto }),
+            );
+            await queryRunner.manager.save(programs);
+            await queryRunner.commitTransaction();
+            return programs;
+        } catch (error) {
+            await queryRunner.rollbackTransaction();
+            this.handleException(error);
+        } finally {
+            await queryRunner.release();
+        }
+    }
 
     private handleException(error: any): never {
         if (error instanceof HttpException) throw error;
