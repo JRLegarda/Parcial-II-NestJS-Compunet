@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ProgramService } from './program.service';
 import { CreateProgramDto } from './dto/create-program.dto';
 import { PaginationDto } from './dto/pagination.dto';
@@ -18,6 +18,10 @@ export class ProgramController {
     return this.programService.findAll(paginationDto);
   }
   // TODO Reto 2: GET    /api/program/:id           -> programa con sus estudiantes
+  @Get(":term")
+  findOne(@Param("term") term:string){
+    return this.programService.findOne(term);
+  }
   // TODO Reto 2: PATCH  /api/program/:id/students  -> agregar estudiantes (acumulativo)
   // TODO Reto 3: POST   /api/program/bulk          -> crear programas en lote (todo o nada)
   // TODO Reto 4: proteger los POST y el PATCH para que solo un admin pueda usarlos
